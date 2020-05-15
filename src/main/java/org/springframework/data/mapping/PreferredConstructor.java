@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -159,6 +160,38 @@ public class PreferredConstructor<T, P extends PersistentProperty<P>> {
 		} finally {
 			write.unlock();
 		}
+	}
+
+	private final Map<PersistentProperty<?>, Boolean> isPropertyParameterCache2 = new ConcurrentHashMap<>();
+
+	public boolean isConstructorParameterWithConcurrencyHashMap(PersistentProperty<?> property) {
+		Boolean cached = isPropertyParameterCache2.get(property);
+
+		if (cached != null) {
+			return cached;
+		}
+
+		boolean result = false;
+		for (Parameter<?, P> parameter : parameters) {
+			if (parameter.maps(property)) {
+				isPropertyParameterCache2.put(property, true);
+				result = true;
+				break;
+			}
+		}
+
+		return result;
+	}
+
+	public boolean isConstructorParameterWithConcurrencyHashMapComputeIfAbsent(PersistentProperty<?> property) {
+		return isPropertyParameterCache2.computeIfAbsent(property, p -> {
+			for (Parameter<?, P> parameter : parameters) {
+				if (parameter.maps(property)) {
+					return true;
+				}
+			}
+			return false;
+		});
 	}
 
 	/**
